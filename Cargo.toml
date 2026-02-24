@@ -1,0 +1,8 @@
+[package]
+name = "monad-icons"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+svg = "0.18.0"
+resvg = "0.47.0"

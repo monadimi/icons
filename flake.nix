@@ -1,5 +1,5 @@
 {
-  description = "Nix flake of Zhaoxiuya";
+  description = "Nix flake for Project Halogen";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
@@ -22,6 +22,14 @@
           packages = with pkgs; [
             git
             direnv
+            rustc
+            cargo
+            rustfmt
+            clippy
+            rust-analyzer
+            cargo-dist
+            cargo-release
+            cargo-expand
           ];
         };
       }

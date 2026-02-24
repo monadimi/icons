@@ -6,3 +6,8 @@ result-*
 .directory
 .Trash-*
 .nfs*
+
+
+# Added by cargo
+
+/target
