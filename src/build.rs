@@ -1,38 +1,49 @@
 use crate::icon::*;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    f64::consts::TAU,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use svg::{
     Document,
     node::{Comment, element::*},
 };
 
-fn tricoord(a: f64, b: f64, c: f64) -> (f64, f64) {
-    let unit: f64 = 1.0 / 26.0;
-    (
-        ((b - c) * (3.0f64).sqrt() / 2.0f64) * unit,
-        (-a + (b + c) / 2.0f64) * unit,
-    )
+#[derive(Clone, Copy)]
+struct Coord {
+    x: f64,
+    y: f64,
 }
 
-macro_rules! tripolyline {
-    ( ( $a0:expr, $b0:expr, $c0:expr ), $( ( $a:expr, $b:expr, $c:expr ) ),* $(,)? ) => {{
-        let mut s = String::new();
-        let (x, y) = tricoord($a0 as f64, $b0 as f64, $c0 as f64);
-        s.push_str(&format!("M{},{} ",x,y));
-        $(
-            let (x, y) = tricoord($a as f64, $b as f64, $c as f64);
-            s.push_str(&format!("L{},{} ",x,y));
-        )*
-        s.push_str("Z");
-        s
-    }}
+impl Coord {
+    fn from_polar(theta: f64, radius: f64) -> Coord {
+        let x: f64 = theta.cos() * radius;
+        let y: f64 = theta.sin() * radius;
+        Coord { x, y }
+    }
+
+    fn from_tricoord(ic: f64, jc: f64) -> Coord {
+        let i = (ic - 4.5) * (3f64.sqrt() / 9.0);
+        let j = (jc - 4.5) * (3f64.sqrt() / 9.0);
+
+        Coord {
+            x: i,
+            y: (-i + 2.0 * j) * (3f64.sqrt() / 3.0),
+        }
+    }
 }
 
 impl Icon {
     pub fn new(info: &IconInfo) -> Self {
+        print!(
+            "({},{})\n",
+            Coord::from_tricoord(6.0, 6.0).x,
+            Coord::from_tricoord(6.0, 6.0).y
+        );
+        let r = 3f64.sqrt() / 9.0; // tmp
+
         let icon_size = 1024.0;
         let stroke_color = info.stroke_color.clone();
         let background_color = info.background_color.clone();
-        let unit: f64 = 1.0 / 26.0;
         let bg = {
             let bg_color = background_color;
             Rectangle::new()
@@ -42,75 +53,84 @@ impl Icon {
                 .set("height", icon_size)
                 .set("fill", bg_color)
         };
-        let body = vec![
-            tripolyline![
-                (13, 0, 8),
-                (11, 0, 10),
-                (0, 0, -1),
-                (-11, 0, -1),
-                (-13, 0, -5),
-                (0, 0, -5)
-            ],
-            tripolyline![
-                (13, 0, 8),
-                (11, 0, 10),
-                (0, 0, -1),
-                (-11, 0, -1),
-                (-13, 0, -5),
-                (0, 0, -5)
-            ],
-            tripolyline![
-                (10, 0, 11),
-                (8, 0, 13),
-                (0, 0, 5),
-                (-8, 0, 5),
-                (-10, 0, 1),
-                (0, 0, 1)
-            ],
-            tripolyline![(5, 0, -2), (5, 0, -8), (1, 0, -10), (1, 0, -6)],
-            tripolyline![(-5, 0, -7), (-5, 0, -13), (-1, 0, -11), (-1, 0, -7)],
-        ]
-        .iter()
-        .map(|x| Path::new().set("d", x.to_string()))
-        .fold(Group::new(), |g, x| g.add(x));
-        let orbs = [
-            tricoord(9.0, 0.0, 0.0),
-            tricoord(0.0, 9.0, 0.0),
-            tricoord(0.0, 0.0, 9.0),
-        ]
-        .map(|(x, y)| Circle::new().set("cx", x).set("cy", y).set("r", unit * 2.0))
-        .iter()
-        .fold(Group::new(), |g, x| g.add(x.clone()));
+
+        let fi = (3f64.sqrt() / 6f64).asin();
+
+        let orbs = (0..3)
+            .map(|x| 90f64 + (120f64 * (x as f64)))
+            .map(|x| TAU * x / 360f64)
+            .map(|x| Coord::from_polar(x, 1f64))
+            .map(|v| Polyline::new().set("points", format!("{},{} {},{}", v.x, v.y, v.x, v.y)))
+            .fold(Group::new(), |g, x| g.add(x));
+
+        let body = {
+            let body_p: Vec<Coord> = (0..3)
+                .map(|x| 30f64 + (120f64 * (x as f64)))
+                .map(|x| TAU * x / 360f64)
+                .flat_map(|x| [x - fi, x + fi])
+                .map(|x| Coord::from_polar(x, 1f64))
+                .collect();
+            let center_j = vec![
+                Coord::from_tricoord(3f64, 3f64),
+                Coord::from_tricoord(6f64, 6f64),
+            ];
+            let edge_j = vec![
+                Coord::from_tricoord(9f64, 7.5f64),
+                Coord::from_tricoord(7.5f64, 9f64),
+            ];
+            let ret = vec![
+                vec![body_p[0], edge_j[0]],
+                vec![body_p[1], edge_j[1]],
+                vec![body_p[2], center_j[1], body_p[5]],
+                vec![body_p[3], center_j[0], body_p[4]],
+            ]
+            .iter()
+            .map(|arr| {
+                Polyline::new().set(
+                    "points",
+                    arr.iter()
+                        .map(|v| format!("{},{}", v.x, v.y))
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+            })
+            .fold(Group::new(), |g, x| g.add(x));
+            ret
+        };
+
         let icon = Group::new()
             .set(
                 "transform",
                 format!(
-                    "translate({} {}) scale({})",
+                    "translate({} {}) scale({} -{})",
                     icon_size / 2.0,
                     icon_size / 2.0,
-                    icon_size
+                    icon_size / 2.0 / (1.0 + r + 1.0 / 64.0),
+                    icon_size / 2.0 / (1.0 + r + 1.0 / 64.0)
                 ),
             )
             .set("fill", "none")
             .set("stroke", stroke_color)
-            .set("stroke-width", icon_size / 32768.0)
+            .set("stroke-width", r * 2.0)
             .set("stroke-linecap", "round")
             .set("stroke-linejoin", "round")
-            .add(body)
-            .add(orbs);
+            .add(orbs)
+            .add(body);
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let comment = {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
 
-        let comment = Group::new()
-            .add(Comment::new("The Monad Club icon"))
-            .add(Comment::new("Author: Sua Tso <zhaoxiuya13@gmail.com>"))
-            .add(Comment::new(
-                "Repository: https://github.com/monadimi/icons",
-            ))
-            .add(Comment::new(format!("Generated at Unix timestamp {}", now)));
+            Group::new()
+                .add(Comment::new("The Monad Club icon"))
+                .add(Comment::new("Author: Sua Tso <zhaoxiuya13@gmail.com>"))
+                .add(Comment::new(
+                    "Repository: https://github.com/monadimi/icons",
+                ))
+                .add(Comment::new(format!("Generated at Unix timestamp {}", now)))
+        };
 
         let data = Document::new()
             .set("viewBox", (0.0, 0.0, icon_size, icon_size))
