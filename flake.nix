@@ -20,6 +20,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+            pkg-config
             git
             direnv
             rustc
@@ -30,7 +31,17 @@
             cargo-dist
             cargo-release
             cargo-expand
+            imagemagick
+            llvmPackages.libclang
           ];
+
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+
+          BINDGEN_EXTRA_CLANG_ARGS =
+            "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.llvmPackages.libclang.version}/include" +
+            " -isystem ${pkgs.glibc.dev}/include" +
+            " -DMAGICKCORE_HDRI_ENABLE=1" +
+            " -DMAGICKCORE_QUANTUM_DEPTH=16";
         };
       }
     );

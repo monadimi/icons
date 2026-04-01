@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 svg = "0.18.0"
 resvg = "0.47.0"
+magick_rust = "2.0.0"
+anyhow = "1.0.102"
+tiny-skia = "0.12.0"
